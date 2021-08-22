@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>Linux-SFTP設定</title>
+    <url>/2021/07/17/Linux-SFTP%E8%A8%AD%E5%AE%9A/</url>
+    <content><![CDATA[<p>設定Linux SFTP 方式</p>
+<span id="more"></span>
+
+<h1 id="環境"><a href="#環境" class="headerlink" title="環境"></a>環境</h1><ul>
+<li>Ubuntu 20.04</li>
+</ul>
+<blockquote>
+<p>在Linux系統中，Redhat通常已安裝<code>openssh-client</code>及<code>openssh-server</code>，所以不需為了SFTP重新安裝</p>
+<p>而Ubuntu只安裝<code>openssh-clinet</code>，要使用SFTP則需要安裝多安裝<code>openssh-server</code></p>
+<p>而設定方法都一樣</p>
+</blockquote>
+<h1 id="安裝"><a href="#安裝" class="headerlink" title="安裝"></a>安裝</h1><ol>
+<li><p>為避免預設的openssh-clinet跟openssh-server版本衝突</p>
+<ul>
+<li><p>先檢查openssh-client有無安裝</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">查詢package</span></span><br><span class="line">dpkg --get-selections |grep ssh</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p>有安裝</p>
+<p><img src="/2021/07/17/Linux-SFTP%E8%A8%AD%E5%AE%9A/image-20210717145521697.png" alt="image-20210717145521697"></p>
+</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">解除安裝</span></span><br><span class="line">sudo apt-get remove openssh-client</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">安裝</span></span><br><span class="line">sudo apt-get install openssh-client</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p>安裝openssh-server</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">安裝openssh-server</span></span><br><span class="line">sudo apt-get install openssh-server</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h1 id="環境配置"><a href="#環境配置" class="headerlink" title="環境配置"></a>環境配置</h1><ol>
+<li><p>可建使用者帳號or群組，供之後管理使用，我這邊使用使用者帳號</p>
+</li>
+<li><p>建立使用者帳號</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 只供SFTP使用 考慮資安就不允許login及家目錄</span></span><br><span class="line">sudo useradd -s /sbin/nologin -M sftp_user</span><br></pre></td></tr></table></figure></li>
+<li><p>建立SFTP帳號所使用的目錄</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 這裡設定 /Test/Sftp_user 為SFTP進入的指定目錄 --可根據需求改變</span></span><br><span class="line">sudo mkdir -p /Test/sftp_user</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> **重要** 指定目錄權限需為root:root 755 --這是SFTP的限制 也是為了防止SFTP帳號可以往上層移動</span></span><br><span class="line"><span class="meta">#</span><span class="bash"> 權限 為設定的目錄那層</span></span><br><span class="line">sudo chown root:root sftp_user</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">權限設定 755</span></span><br><span class="line">sudo chmod 755 sftp_user</span><br></pre></td></tr></table></figure></li>
+<li><p>SFTP設定檔設定</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 開啟設定</span></span><br><span class="line">vi /etc/ssh/sshd_config</span><br></pre></td></tr></table></figure>
+
+<ol>
+<li><p>找到<code>Subsystem                sftp            /usr/lib......../sftp_server</code> 後面路徑看系統</p>
+</li>
+<li><p>前面加<code>#</code>註解，不然系統啟動會出錯</p>
+</li>
+<li><p>新增下面這行</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 新增此行</span></span><br><span class="line">Subsystem	sftp	internal-sftp</span><br></pre></td></tr></table></figure></li>
+<li><p>新增下面這組設定</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">Match User sftp_user # User 可置換成Group 變成以群組控制，sftp_user為使用者帳號，多個使用者或群組，可用逗號分開</span><br><span class="line">		ChrootDirectory /Test/sftp_user # 需要指定的目錄</span><br><span class="line">		ForceCommand internal-sftp # 配置的關鍵字，強制執行內部SFTP，並忽略任何 ~/.ssh/rc 的命令</span><br><span class="line">		AllowTcpForwarding no # 禁止端口轉發</span><br><span class="line">		x11Forwarding no # 禁止X11轉發</span><br></pre></td></tr></table></figure></li>
+<li><p>設定完後 重啟服務</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 重啟服務</span></span><br><span class="line">sudo systemctl restart sshd.service</span><br></pre></td></tr></table></figure></li>
+</ol>
+</li>
+</ol>
+]]></content>
+      <categories>
+        <category>Linux</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Vim</title>
+    <url>/2021/07/17/Vim/</url>
+    <content><![CDATA[<p>紀錄一些常用操作</p>
+<span id="more"></span>
+
+<h1 id="模式"><a href="#模式" class="headerlink" title="模式"></a>模式</h1><ul>
+<li>一般模式(normal)<ul>
+<li>i = insert</li>
+<li>a = append</li>
+<li>o = new line<br>上述指令切至insert模式</li>
+</ul>
+</li>
+</ul>
+<pre><code>- v = visual
+- V = visual line
+上述指令切至visual模式
+</code></pre>
+<ul>
+<li>編輯模式(insert)<ul>
+<li>ESC<br>上述指令切至normal模式</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li>視覺模式(visual)<ul>
+<li>ESC<br>上述指令切至normal模式</li>
+</ul>
+</li>
+</ul>
+<h1 id="指令"><a href="#指令" class="headerlink" title="指令"></a>指令</h1><h2 id="搜尋"><a href="#搜尋" class="headerlink" title="搜尋"></a>搜尋</h2><ul>
+<li>搜尋</li>
+</ul>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">/</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>搜尋下一個</li>
+</ul>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">n</span><br></pre></td></tr></table></figure>
+<ul>
+<li>搜尋上一個</li>
+</ul>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line"><span class="keyword">N</span></span><br></pre></td></tr></table></figure>
+
+
+<ul>
+<li>搜尋目前游標的這個字</li>
+</ul>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">*</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>往後搜尋通一行最近的x</li>
+</ul>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">fx</span><br></pre></td></tr></table></figure>
+
+<h2 id="畫面"><a href="#畫面" class="headerlink" title="畫面"></a>畫面</h2><ul>
+<li>讓某一行停在畫面中間<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">zz</span><br></pre></td></tr></table></figure></li>
+<li>讓某一行停在上方<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">zt</span><br></pre></td></tr></table></figure></li>
+<li>讓某一行停在下方<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">zb</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="移動"><a href="#移動" class="headerlink" title="移動"></a>移動</h2><ul>
+<li>往前前進一字(含標點符號)<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line"><span class="keyword">w</span></span><br></pre></td></tr></table></figure></li>
+<li>往前前進一字(跳過標點符號)<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">W</span><br></pre></td></tr></table></figure></li>
+<li>往回退一字(含標點符號)<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line"><span class="keyword">b</span></span><br></pre></td></tr></table></figure></li>
+<li>往回退一字(不含標點符號)<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">B</span><br></pre></td></tr></table></figure></li>
+<li>移到上個段落<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">&#123;</span><br></pre></td></tr></table></figure></li>
+<li>移到下個段落<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>移動整份文章的第一行<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">gg</span><br></pre></td></tr></table></figure></li>
+<li>移動整份文章的最後一行<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">G</span><br></pre></td></tr></table></figure></li>
+</ul>
+<ul>
+<li><p>移到行首</p>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line"><span class="number">0</span></span><br></pre></td></tr></table></figure></li>
+<li><p>移到行尾</p>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">$</span><br></pre></td></tr></table></figure></li>
+<li><p>同一行(同區塊的話,被編輯器斷航),如果要往上</p>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">gk</span><br></pre></td></tr></table></figure></li>
+<li><p>同一行(同區塊的話,被編輯器斷航),如果要往下</p>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">gj</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="複製、貼上"><a href="#複製、貼上" class="headerlink" title="複製、貼上"></a>複製、貼上</h2><ul>
+<li>複製(進入visual選取)—&gt;存到暫存器<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line"><span class="keyword">y</span></span><br></pre></td></tr></table></figure></li>
+<li>快速複製一行(可以直接在normal mode下)<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">yy</span><br></pre></td></tr></table></figure></li>
+<li>快速複製x行(可以直接在normal mode下)<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">xyy</span><br></pre></td></tr></table></figure></li>
+</ul>
+<ul>
+<li><p>y後面可以搭配其他移動指令</p>
+</li>
+<li><p>ex:游標所在地按下y加$ = 複製到字尾</p>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line"><span class="keyword">y</span>$ </span><br></pre></td></tr></table></figure></li>
+<li><p>從VIM外複製貼上</p>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">shift+ins</span><br></pre></td></tr></table></figure></li>
+<li><p>貼上(normal模式下)</p>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line"><span class="keyword">p</span> </span><br></pre></td></tr></table></figure></li>
+<li><p>x個貼上</p>
+<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">xp</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="控制"><a href="#控制" class="headerlink" title="控制"></a>控制</h2><ul>
+<li>回到上一步<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line"><span class="keyword">u</span></span><br></pre></td></tr></table></figure></li>
+</ul>
+<h1 id="設定"><a href="#設定" class="headerlink" title="設定"></a>設定</h1><ul>
+<li>搜尋高亮<figure class="highlight vim"><table><tr><td class="code"><pre><span class="line">:<span class="keyword">set</span> hisearch</span><br></pre></td></tr></table></figure></li>
+</ul>
+]]></content>
+      <categories>
+        <category>IDE</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Liunx校時</title>
+    <url>/2021/07/20/%E6%A0%A1%E6%99%82/</url>
+    <content><![CDATA[<p>Linux校時的方法</p>
+<span id="more"></span>
+
+
+
+<h3 id="chrony"><a href="#chrony" class="headerlink" title="chrony"></a>chrony</h3><p>在Centos8和Redhat已經沒有ntpdate做系統校時了，改用 chrony 來完成系統校時的工作。</p>
+<h3 id="客戶端"><a href="#客戶端" class="headerlink" title="客戶端"></a>客戶端</h3><ul>
+<li><p>修改 <code>/etc/chrony.conf</code></p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> 增加此行</span></span><br><span class="line">server &#123;serverIP&#125; iburst</span><br></pre></td></tr></table></figure></li>
+<li><p>啟動服務</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">systemctl start chronyd.service</span><br></pre></td></tr></table></figure></li>
+<li><p>查看校時主機狀態</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">chronyc sourcestats</span><br></pre></td></tr></table></figure></li>
+<li><p>立即校時</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">chronyc -a makestep</span><br></pre></td></tr></table></figure></li>
+</ul>
+]]></content>
+      <categories>
+        <category>Linux</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Autosys經驗</title>
+    <url>/2021/07/26/Autosys%E7%B6%93%E9%A9%97/</url>
+    <content><![CDATA[<h1 id="Autosys"><a href="#Autosys" class="headerlink" title="Autosys"></a>Autosys</h1><ul>
+<li><p>一些實務上碰到的Autosys的經驗</p>
+<span id="more"></span></li>
+</ul>
+<ul>
+<li>簡化的架構</li>
+</ul>
+<p><a href="https://mermaid-js.github.io/mermaid-live-editor/#/edit/eyJjb2RlIjoiY2xhc3NEaWFncmFtXG5cdEF1dG9zeXNfU2VydmVyPHwtLSBBZ2VudDFcblx0QXV0b3N5c19TZXJ2ZXI8fC0tIEFnZW50MlxuXHRBdXRvc3lzX1NlcnZlcjx8LS0gQWdlbnQzXG5cdEF1dG9zeXNfU2VydmVyOiBPcmFjbGUgREJcblx0QXV0b3N5c19TZXJ2ZXI6IFdDQyBTZXJ2aWNlXG5cdGNsYXNzIEFnZW50MXtcblx0XHTmjpLnqItcblx0XHRBZ2VudCBTZXJ2aWNlKClcdFx0XG5cdH1cblx0Y2xhc3MgQWdlbnQye1xuXHRcdOaOkueoi1xuXHRcdEFnZW50IFNlcnZpY2UoKVxuXHR9XG5cdGNsYXNzIEFnZW50M3tcblx0XHTmjpLnqItcblx0XHRBZ2VudCBTZXJ2aWNlKClcdFx0XG5cdH0gICAgXG4iLCJtZXJtYWlkIjp7InRoZW1lIjoiZGVmYXVsdCJ9fQ"><img src="https://mermaid.ink/img/eyJjb2RlIjoiY2xhc3NEaWFncmFtXG5cdEF1dG9zeXNfU2VydmVyPHwtLSBBZ2VudDFcblx0QXV0b3N5c19TZXJ2ZXI8fC0tIEFnZW50MlxuXHRBdXRvc3lzX1NlcnZlcjx8LS0gQWdlbnQzXG5cdEF1dG9zeXNfU2VydmVyOiBPcmFjbGUgREJcblx0QXV0b3N5c19TZXJ2ZXI6IFdDQyBTZXJ2aWNlXG5cdGNsYXNzIEFnZW50MXtcblx0XHTmjpLnqItcblx0XHRBZ2VudCBTZXJ2aWNlKClcdFx0XG5cdH1cblx0Y2xhc3MgQWdlbnQye1xuXHRcdOaOkueoi1xuXHRcdEFnZW50IFNlcnZpY2UoKVxuXHR9XG5cdGNsYXNzIEFnZW50M3tcblx0XHTmjpLnqItcblx0XHRBZ2VudCBTZXJ2aWNlKClcdFx0XG5cdH0gICAgXG4iLCJtZXJtYWlkIjp7InRoZW1lIjoiZGVmYXVsdCJ9fQ"></a></p>
+<h2 id="常用指令"><a href="#常用指令" class="headerlink" title="常用指令"></a>常用指令</h2><ul>
+<li><p>待補</p>
+</li>
+<li><p>查詢Autosys狀態</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">chk_auto_up -r111</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="issue"><a href="#issue" class="headerlink" title="issue"></a>issue</h2><ol>
+<li><p>Job Status -&gt; pending_machine</p>
+<ul>
+<li>Machine 可能Offline/Missing</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line"># 如果是Offline使用此指令恢復</span><br><span class="line">sendevent -E MACH_ONLINE -N &#123;machine_name&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<ul>
+<li>如果是Missing，請檢查Machine主機是否Agent Service有開啟</li>
+</ul>
+</li>
+</ol>
+]]></content>
+      <categories>
+        <category>維運</category>
+      </categories>
+  </entry>
+  <entry>
+    <title>Azure_Test</title>
+    <url>/2021/08/22/Azure-Test/</url>
+    <content><![CDATA[]]></content>
+  </entry>
+</search>
